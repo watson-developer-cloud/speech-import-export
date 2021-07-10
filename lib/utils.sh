@@ -9,7 +9,32 @@ get_mc(){
     fi
 
     ARC="amd64"
-    MC_URL="https://dl.min.io/client/mc/release/linux-${ARC}/archive/mc.RELEASE.2020-11-17T00-39-14Z"
+    MC_URL="https://dl.min.io/client/mc/release/linux-${ARC}/archive/mc.RELEASE.2021-06-13T17-48-22Z"
+    MC_SHA="83be163227d125e260025e9768924d3fa85d9c299aa58b40c6701b9444789e2d mc.RELEASE.2021-06-13T17-48-22Z"
+
+    ATTEMPTS=0
+    while true
+    do
+	if [ $ATTEMPTS -eq 5 ]; then
+	    echo "Too many checksum validation failures, exiting.."
+	    exit 1
+	fi
+
+	if [ ! -f ${DIST_DIR}/mc ]; then
+	    echo "Getting minio client: ${MC_URL}"
+	    curl -skL "${MC_URL}" -o ${DIST_DIR}/mc
+	    chmod +x ${DIST_DIR}/mc
+	fi
+	echo "83be163227d125e260025e9768924d3fa85d9c299aa58b40c6701b9444789e2d ${DIST_DIR}/mc" | sha256sum -c --status
+
+	if [ $? -eq 0 ]; then
+	    return
+	else
+	    echo "checksum verification failed, redownloading client..."
+	    rm -f ${DIST_DIR}/mc
+	    ATTEMPTS=$((ATTEMPTS+1))
+	fi
+    done
 
     echo "Getting minio client: ${MC_URL}"
     curl -skL "${MC_URL}" -o ${DIST_DIR}/mc
@@ -29,11 +54,13 @@ get_cpdbr(){
 
 }
 
-start_minio_port_forward(){
+start_minio_port_forward() {
+
     mkdir ./${TMP_FILENAME}
     touch ./${TMP_FILENAME}/keep_minio_port_forward
     trap "rm -f ./${TMP_FILENAME}/keep_minio_port_forward" 0 1 2 3 15
     keep_minio_port_forward &
+    echo "Done Port-f/w"
     sleep 5
 }
 
