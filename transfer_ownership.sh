@@ -11,10 +11,7 @@ cmd_check(){
 }
 
 convert_instanceid_to_uuid() {
-    local slice1=`echo $1 | cut -c1-4`
-    local slice2=`echo $1 | cut -c5-`
-    local uuid=`printf "00000000-0000-0000-%s-%s" $slice1 $slice2`
-    echo "$uuid"
+    echo `printf "%032d\n" $1 | sed 's/\(........\)\(....\)\(....\)\(....\)\(............\)/\1-\2-\3-\4-\5/'`
 }
 
 if [ $# -lt 4 ] ; then

@@ -2,12 +2,13 @@
 
 printUsage() {
     echo "Usage: $(basename ${0}) [import|export]"
-    echo "    -c [custom resource name (CP4D 4.x) / release name (CP4D 3.5)]"
+    echo "    -c [custom resource name (CP4D 4.x) / release name (CP4D 3.5 and earlier)]"
     echo "    -o [import/export directory]"
-    echo "    -v [version]: 35 (CP4D3.5) or 40 (CP4D 4.x)"
+    echo "    -v [version]: 301 (CP4D3.0.1), 35 (CP4D3.5),  40 (CP4D 4.x)"
     echo "    -p [postgres auth secret name](optional)"
     echo "    -m [minio auth secret name](optional)"
     echo "    -n [namespace](optional)"
+    echo "    --no-quiesce Don't quiesce microservices before export (optional)"
     exit 1
 }
 
@@ -38,7 +39,10 @@ unquiesce_services() {
 cmd_check(){
     if [ $? -ne 0 ] ; then
 	echo "[FAIL] $DBNAME $COMMAND"
-	unquiesce_services
+	if ! $noquiesce
+	then
+	    unquiesce_services
+	fi
 	exit 1
     fi
 }
@@ -67,12 +71,18 @@ pgsecretflag=false
 miniosecretflag=false
 exportflag=false
 versionflag=false
+noquiesce=false
 
 COMMAND=$1
 shift
-while getopts n:c:o:p:m:v: OPT
+while getopts n:c:o:p:m:v:-: OPT
 do
     case $OPT in
+	"-" )
+	    case "${OPTARG}" in
+		no-quiesce) noquiesce=true ;;
+	    esac;;
+
 	"n" ) KUBECTL_ARGS="${KUBECTL_ARGS} --namespace=$OPTARG" ;;
 	"c" ) crflag=true; CR_NAME=$OPTARG ;;
 	"p" ) pgsecretflag=true; PG_SECRET_NAME=$OPTARG ;;
@@ -100,15 +110,15 @@ then
     exit 1
 fi
 
-if [ $CP4D_VERSION != "35" ] && [ $CP4D_VERSION != "40" ]
+if [ $CP4D_VERSION != "301" ] && [ $CP4D_VERSION != "35" ] && [ $CP4D_VERSION != "40" ]
 then
-    echo "ERROR: Version flag must be one of [35 , 40], was $CP4D_VERSION"
+    echo "ERROR: Version flag must be one of [301, 35 , 40], was $CP4D_VERSION"
     exit 1
 fi
 
 if ! $pgsecretflag
 then
-    if [ $CP4D_VERSION == "35" ]
+    if [ $CP4D_VERSION == "35" ] || [ $CP4D_VERSION == "301" ]
     then
 	PG_SECRET_NAME="user-provided-postgressql"
     else
@@ -119,7 +129,7 @@ fi
 
 if ! $miniosecretflag
 then
-    if [ $CP4D_VERSION == "35" ]
+    if [ $CP4D_VERSION == "35" ] || [ $CP4D_VERSION == "301" ]
     then
 	MINIO_SECRET_NAME="minio"
     else
@@ -140,12 +150,23 @@ MC=${LIB_DIR}/mc
 if [ $CP4D_VERSION == "35" ]
 then
     MINIO_RELEASE_LABEL="$CR_NAME-speech-to-text-minio"
+    MINIO_CHART_LABEL="helm.sh/chart=ibm-minio"
     PG_PW_TEMPLATE="{{.data.PG_PASSWORD}}"
     PG_USERNAME="enterprisedb"
+    PG_COMPONENT_LABEL="app.kubernetes.io/component=postgres"
+elif [ $CP4D_VERSION == "301" ]
+then
+    MINIO_RELEASE_LABEL="$CR_NAME"
+    MINIO_CHART_LABEL="helm.sh/chart=minio"
+    PG_PW_TEMPLATE="{{.data.pg_su_password}}"
+    PG_USERNAME="stolon"
+    PG_COMPONENT_LABEL="component=stolon-proxy"
 else
     MINIO_RELEASE_LABEL="$CR_NAME"
+    MINIO_CHART_LABEL="helm.sh/chart=ibm-minio"
     PG_PW_TEMPLATE="{{.data.password}}"
     PG_USERNAME="postgres"
+    PG_COMPONENT_LABEL="app.kubernetes.io/component=postgres"
 
     if type "cpdbr" > /dev/null 2>&1; then
 	CPDBR=cpdbr
@@ -162,13 +183,16 @@ fi
 MINIO_LPORT=9001
 MINIO_PORT=9000
 TMP_FILENAME="spchtmp_`date '+%Y%m%d_%H%M%S'`"
+
 MINIO_ACCESS_KEY=`kubectl ${KUBECTL_ARGS} get secret $MINIO_SECRET_NAME --template '{{.data.accesskey}}' | base64 --decode`
 MINIO_SECRET_KEY=`kubectl ${KUBECTL_ARGS} get secret $MINIO_SECRET_NAME --template '{{.data.secretkey}}' | base64 --decode`
-MINIO_SVC=`kubectl ${KUBECTL_ARGS} get svc -l release=$MINIO_RELEASE_LABEL,helm.sh/chart=ibm-minio -o jsonpath="{.items[*].metadata.name}" | tr '[[:space:]]' '\n' | grep headless`
+MINIO_SVC=`kubectl ${KUBECTL_ARGS} get svc -l release=$MINIO_RELEASE_LABEL,$MINIO_CHART_LABEL -o jsonpath="{.items[*].metadata.name}" | tr '[[:space:]]' '\n' | grep headless`
+
 
 #Postgres setup
 SQL_PASSWORD=`kubectl ${KUBECTL_ARGS} get secret $PG_SECRET_NAME --template $PG_PW_TEMPLATE | base64 --decode`
-PG_POD=`kubectl ${KUBECTL_ARGS} get pods -o jsonpath='{.items[0].metadata.name}' -l app.kubernetes.io/component=postgres,app.kubernetes.io/instance=$CR_NAME | head -n 1`
+PG_POD=`kubectl ${KUBECTL_ARGS} get pods -o jsonpath='{.items[0].metadata.name}' -l $PG_COMPONENT_LABEL,app.kubernetes.io/instance=$CR_NAME | head -n 1`
+
 
 if [ ${COMMAND} = 'export' ] ; then
     echo "PG_POD:$PG_POD"
@@ -181,7 +205,10 @@ if [ ${COMMAND} = 'export' ] ; then
     # block until there are no more jobs in Waiting or Processing state
     wait_for_async_jobs
 
-    quiesce_services
+    if ! $noquiesce
+    then
+	quiesce_services
+    fi
 
     # ----- POSTGRES -----
     echo "----- Exporting PostgreSQL Database -----"
@@ -226,7 +253,11 @@ if [ ${COMMAND} = 'export' ] ; then
     stop_minio_port_forward $TMP_FILENAME
     echo "[SUCCESS] minio export"
 
-    unquiesce_services
+    if ! $noquiesce
+    then
+	unquiesce_services
+    fi
+
 
 elif [ ${COMMAND} = 'import' ] ; then
 
@@ -236,7 +267,10 @@ elif [ ${COMMAND} = 'import' ] ; then
 	exit 1
     fi
 
-    quiesce_services
+    if ! $noquiesce
+    then
+	quiesce_services
+    fi
 
     # ----- POSTGRES -----
     echo "----- Importing PostgreSQL Database -----"
@@ -284,7 +318,11 @@ elif [ ${COMMAND} = 'import' ] ; then
     stop_minio_port_forward $TMP_FILENAME
     echo "[SUCCESS] minio import"
 
-    unquiesce_services
+    if ! $noquiesce
+    then
+	unquiesce_services
+    fi
+
 
 else
     printUsage
