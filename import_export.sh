@@ -9,7 +9,6 @@ printUsage() {
     echo "    -m [minio auth secret name](optional)"
     echo "    -n [namespace](optional)"
     echo "    --no-quiesce Don't quiesce microservices before export (optional)"
-    exit 1
 }
 
 quiesce_services() {
@@ -62,9 +61,9 @@ wait_for_async_jobs() {
     done
 }
 
-if [ $# -lt 5 ] ; then
-    printUsage
-fi
+# if [ $# -lt 5 ] ; then
+#     printUsage
+# fi
 
 crflag=false
 pgsecretflag=false
@@ -73,16 +72,23 @@ exportflag=false
 versionflag=false
 noquiesce=false
 
+
 COMMAND=$1
 shift
-while getopts n:c:o:p:m:v:-: OPT
+if [[ $COMMAND != "import" ]] && [[ $COMMAND != "export" ]]; then
+    printUsage
+    exit 1
+fi
+
+while getopts "n:c:o:p:m:v:-:h" OPT
 do
     case $OPT in
 	"-" )
 	    case "${OPTARG}" in
 		no-quiesce) noquiesce=true ;;
+		help) printUsage; exit 1 ;;
 	    esac;;
-
+	"h" ) printUsage; exit 1 ;;
 	"n" ) KUBECTL_ARGS="${KUBECTL_ARGS} --namespace=$OPTARG" ;;
 	"c" ) crflag=true; CR_NAME=$OPTARG ;;
 	"p" ) pgsecretflag=true; PG_SECRET_NAME=$OPTARG ;;
@@ -116,6 +122,7 @@ then
     exit 1
 fi
 
+#Use default value for postgres auth secret if not provided
 if ! $pgsecretflag
 then
     if [ $CP4D_VERSION == "35" ] || [ $CP4D_VERSION == "301" ]
@@ -127,6 +134,7 @@ then
     echo "WARNING: No Postgres auth secret provided, defaulting to: $PG_SECRET_NAME"
 fi
 
+#Use default value for minio auth secret if not provided
 if ! $miniosecretflag
 then
     if [ $CP4D_VERSION == "35" ] || [ $CP4D_VERSION == "301" ]
@@ -322,8 +330,4 @@ elif [ ${COMMAND} = 'import' ] ; then
     then
 	unquiesce_services
     fi
-
-
-else
-    printUsage
 fi
