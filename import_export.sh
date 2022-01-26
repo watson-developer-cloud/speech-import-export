@@ -9,6 +9,8 @@ printUsage() {
     echo "    -m [minio auth secret name](optional)"
     echo "    -n [namespace](optional)"
     echo "    --no-quiesce Don't quiesce microservices before export (optional)"
+    echo "    -h Show this menu"
+    exit 1
 }
 
 quiesce_services() {
@@ -61,7 +63,7 @@ wait_for_async_jobs() {
     done
 }
 
-# if [ $# -lt 5 ] ; then
+# if [ $# -lt 7 ] ; then
 #     printUsage
 # fi
 
