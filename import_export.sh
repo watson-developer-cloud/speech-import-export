@@ -9,6 +9,8 @@ printUsage() {
     echo "    -m [minio auth secret name](optional)"
     echo "    -n [namespace](optional)"
     echo "    --no-quiesce Don't quiesce microservices before export (optional)"
+    echo "    -h Show this menu"
+    exit 0
 }
 
 quiesce_services() {
@@ -61,9 +63,9 @@ wait_for_async_jobs() {
     done
 }
 
-# if [ $# -lt 5 ] ; then
-#     printUsage
-# fi
+if [ $# -lt 7 ] ; then
+    printUsage
+fi
 
 crflag=false
 pgsecretflag=false
@@ -145,6 +147,7 @@ then
     fi
     echo "WARNING: No MinIO auth secret provided, defaulting to: $MINIO_SECRET_NAME"
 fi
+
 
 SCRIPT_DIR=$(dirname $0)
 LIB_DIR=${SCRIPT_DIR}/lib
