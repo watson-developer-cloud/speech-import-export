@@ -9,7 +9,7 @@ printUsage() {
     echo "    -m [minio auth secret name](optional)"
     echo "    -n [namespace](optional)"
     echo "    --no-quiesce Don't quiesce microservices before export (optional)"
-    echo "    -h Show this menu"
+    echo "    -h/--help Show this menu"
     exit 1
 }
 
