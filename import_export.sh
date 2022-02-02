@@ -10,7 +10,7 @@ printUsage() {
     echo "    -n [namespace](optional)"
     echo "    --no-quiesce Don't quiesce microservices before export (optional)"
     echo "    -h Show this menu"
-    exit 0
+    exit 1
 }
 
 quiesce_services() {
