@@ -6,6 +6,7 @@ printUsage() {
     echo "    -v [version]: 301 (CP4D3.0.1), 35 (CP4D3.5),  40 (CP4D 4.x)"
     echo "    -p [postgres auth secret name](optional)"
     echo "    -n [namespace](optional)"
+    echo "    -h/--help [namespace](optional)"
 }
 
 cmd_check(){
