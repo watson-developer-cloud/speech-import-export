@@ -17,11 +17,11 @@ quiesce_services() {
     echo "Quiescing services"
     if [ $CP4D_VERSION == "40" ]
     then
-	${LIB_DIR}/cpdbr quiesce ${KUBECTL_ARGS}
-	cmd_check
+        ${LIB_DIR}/cpdbr quiesce ${KUBECTL_ARGS}
+        cmd_check
     else
-	${LIB_DIR}/quiesce.sh on ${CR_NAME}
-	cmd_check
+        ${LIB_DIR}/quiesce.sh on ${CR_NAME}
+        cmd_check
     fi
 }
 
@@ -29,22 +29,22 @@ unquiesce_services() {
     echo "Unquiescing services"
     if [ $CP4D_VERSION == "40" ]
     then
-	${LIB_DIR}/cpdbr unquiesce ${KUBECTL_ARGS}
-	cmd_check
+        ${LIB_DIR}/cpdbr unquiesce ${KUBECTL_ARGS}
+        cmd_check
     else
-	${LIB_DIR}/quiesce.sh off ${CR_NAME}
-	cmd_check
+        ${LIB_DIR}/quiesce.sh off ${CR_NAME}
+        cmd_check
     fi
 }
 
 cmd_check(){
     if [ $? -ne 0 ] ; then
-	echo "[FAIL] $DBNAME $COMMAND"
-	if ! $noquiesce
-	then
-	    unquiesce_services
-	fi
-	exit 1
+        echo "[FAIL] $DBNAME $COMMAND"
+        if [ $noquiesce = 'false' ]
+        then
+            unquiesce_services
+        fi
+        exit 1
     fi
 }
 
@@ -53,13 +53,13 @@ wait_for_async_jobs() {
     active_job_count=1
     while [ $active_job_count -gt 0 ]
     do
-	active_job_count=`kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; psql -t -v -d stt-async -U $PG_USERNAME -h ${PG_POD} -p 5432 -c \"SELECT count(status) FROM jobs WHERE status='Waiting' or status='Processing';\""`
-	if [ $active_job_count -gt 0 ]; then
-	    echo "At least 1 async job is in 'Waiting' or 'Processing' state.. performing exponential backoff to wait for jobs to complete before switching async service to read only"
-	    echo "Sleeping for $sleep_time seconds"
-	    sleep $sleep_time
-	    sleep_time=$(($sleep_time**2))
-	fi
+        active_job_count=`kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; psql -t -v -d stt-async -U $PG_USERNAME -h ${PG_POD} -p 5432 -c \"SELECT count(status) FROM jobs WHERE status='Waiting' or status='Processing';\""`
+        if [ ${active_job_count:=0} -gt 0 ]; then
+            echo "At least 1 async job is in 'Waiting' or 'Processing' state.. performing exponential backoff to wait for jobs to complete before switching async service to read only"
+            echo "Sleeping for $sleep_time seconds"
+            sleep $sleep_time
+            sleep_time=$(($sleep_time**2))
+        fi
     done
 }
 
@@ -74,6 +74,10 @@ exportflag=false
 versionflag=false
 noquiesce=false
 
+doasync=true
+dosttcust=true
+dottscust=true
+
 
 COMMAND=$1
 shift
@@ -85,18 +89,18 @@ fi
 while getopts "n:c:o:p:m:v:-:h" OPT
 do
     case $OPT in
-	"-" )
-	    case "${OPTARG}" in
-		no-quiesce) noquiesce=true ;;
-		help) printUsage; exit 1 ;;
-	    esac;;
-	"h" ) printUsage; exit 1 ;;
-	"n" ) KUBECTL_ARGS="${KUBECTL_ARGS} --namespace=$OPTARG" ;;
-	"c" ) crflag=true; CR_NAME=$OPTARG ;;
-	"p" ) pgsecretflag=true; PG_SECRET_NAME=$OPTARG ;;
-	"m" ) miniosecretflag=true; MINIO_SECRET_NAME=$OPTARG ;;
-	"o" ) exportflag=true; EXPORT_DIR=$OPTARG ;;
-	"v" ) versionflag=true; CP4D_VERSION=$OPTARG ;;
+        "-" )
+            case "${OPTARG}" in
+                no-quiesce) noquiesce=true ;;
+                help) printUsage; exit 1 ;;
+            esac;;
+        "h" ) printUsage; exit 1 ;;
+        "n" ) KUBECTL_ARGS="${KUBECTL_ARGS} --namespace=$OPTARG" ;;
+        "c" ) crflag=true; CR_NAME=$OPTARG ;;
+        "p" ) pgsecretflag=true; PG_SECRET_NAME=$OPTARG ;;
+        "m" ) miniosecretflag=true; MINIO_SECRET_NAME=$OPTARG ;;
+        "o" ) exportflag=true; EXPORT_DIR=$OPTARG ;;
+        "v" ) versionflag=true; CP4D_VERSION=$OPTARG ;;
     esac
 done
 
@@ -125,25 +129,25 @@ then
 fi
 
 #Use default value for postgres auth secret if not provided
-if ! $pgsecretflag
+if [ $pgsecretflag = 'false' ]
 then
     if [ $CP4D_VERSION == "35" ] || [ $CP4D_VERSION == "301" ]
     then
-	PG_SECRET_NAME="user-provided-postgressql"
+        PG_SECRET_NAME="user-provided-postgressql"
     else
-	PG_SECRET_NAME="$CR_NAME-postgres-auth-secret"
+        PG_SECRET_NAME="$CR_NAME-postgres-auth-secret"
     fi
     echo "WARNING: No Postgres auth secret provided, defaulting to: $PG_SECRET_NAME"
 fi
 
 #Use default value for minio auth secret if not provided
-if ! $miniosecretflag
+if [ $miniosecretflag = 'false' ]
 then
     if [ $CP4D_VERSION == "35" ] || [ $CP4D_VERSION == "301" ]
     then
-	MINIO_SECRET_NAME="minio"
+        MINIO_SECRET_NAME="minio"
     else
-	MINIO_SECRET_NAME="$CR_NAME-ibm-minio-auth"
+        MINIO_SECRET_NAME="$CR_NAME-ibm-minio-auth"
     fi
     echo "WARNING: No MinIO auth secret provided, defaulting to: $MINIO_SECRET_NAME"
 fi
@@ -180,13 +184,24 @@ else
     PG_COMPONENT_LABEL="app.kubernetes.io/component=postgres"
 
     if type "cpdbr" > /dev/null 2>&1; then
-	CPDBR=cpdbr
+        CPDBR=cpdbr
     elif type "${LIB_DIR}/cpdbr" > /dev/null 2>&1; then
-	CPDBR=${LIB_DIR}/cpdbr
+        CPDBR=${LIB_DIR}/cpdbr
     else
-	echo "downloading cpdbr..."
-	get_cpdbr ${LIB_DIR}
-	CPDBR=${LIB_DIR}/cpdbr
+        echo "downloading cpdbr..."
+        get_cpdbr ${LIB_DIR}
+        CPDBR=${LIB_DIR}/cpdbr
+    fi
+
+    #figure out which components are installed
+    if [[ $(oc get watsonspeech $CR_NAME -o jsonpath="{.status.sttAsyncStatus}") = "Not Installed" ]]; then
+        doasync=false
+    fi
+    if [[ $(oc get watsonspeech $CR_NAME -o jsonpath="{.status.sttCustomizationStatus}") = "Not Installed" ]]; then
+        dosttcust=false
+    fi
+    if [[ $(oc get watsonspeech $CR_NAME -o jsonpath="{.status.ttsCustomizationStatus}") = "Not Installed" ]]; then
+        dottscust=false
     fi
 fi
 
@@ -214,42 +229,55 @@ if [ ${COMMAND} = 'export' ] ; then
     mkdir -p "${EXPORT_DIR}/minio"
 
     # block until there are no more jobs in Waiting or Processing state
-    wait_for_async_jobs
+    if [ $doasync = 'true' ]; then
+        wait_for_async_jobs
+    fi
 
-    if ! $noquiesce
-    then
-	quiesce_services
+    if [ $noquiesce = 'false' ]; then
+        quiesce_services
     fi
 
     # ----- POSTGRES -----
     echo "----- Exporting PostgreSQL Database -----"
 
     # ----- STT CUST -----
-    echo "run pg_dump on stt-customization (1/3)"
-    DBNAME="stt-customization"
-    kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_dump --data-only --format=custom -h ${PG_POD} -p 5432 -d stt-customization -U $PG_USERNAME" > ${EXPORT_DIR}/postgres/stt-customization.export.dump
-    cmd_check
-    #Silently dump a human-readable (hidden) version with schema
-    kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_dump -h ${PG_POD} -p 5432 -d stt-customization -U $PG_USERNAME" > ${EXPORT_DIR}/postgres/.sttcust-hr.sql 2>/dev/null
-    echo "[SUCCESS] $DBNAME $COMMAND"
+    if [ $dosttcust = 'true' ]; then
+        echo "run pg_dump on stt-customization (1/3)"
+        DBNAME="stt-customization"
+        kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_dump --data-only --format=custom -h ${PG_POD} -p 5432 -d stt-customization -U $PG_USERNAME" > ${EXPORT_DIR}/postgres/stt-customization.export.dump
+        cmd_check
+        #Silently dump a human-readable (hidden) version with schema
+        kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_dump -h ${PG_POD} -p 5432 -d stt-customization -U $PG_USERNAME" > ${EXPORT_DIR}/postgres/.sttcust-hr.sql 2>/dev/null
+        echo "[SUCCESS] $DBNAME $COMMAND"
+    else
+        echo "STT Customization is not installed, skipping database."
+    fi
 
     # ----- TTS CUST -----
-    echo "run pg_dump on tts-customization (2/3)"
-    DBNAME="tts-customization"
-    kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_dump --data-only --format=custom -h ${PG_POD} -p 5432 -d tts-customization -U $PG_USERNAME" > ${EXPORT_DIR}/postgres/tts-customization.export.dump
-    cmd_check
-    #Silently dump a human-readable (hidden) version with schema
-    kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_dump -h ${PG_POD} -p 5432 -d tts-customization -U $PG_USERNAME" > ${EXPORT_DIR}/postgres/.ttscust-hr.sql 2>/dev/null
-    echo "[SUCCESS] $DBNAME $COMMAND"
+    if [ $dottscust = 'true' ]; then
+        echo "run pg_dump on tts-customization (2/3)"
+        DBNAME="tts-customization"
+        kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_dump --data-only --format=custom -h ${PG_POD} -p 5432 -d tts-customization -U $PG_USERNAME" > ${EXPORT_DIR}/postgres/tts-customization.export.dump
+        cmd_check
+        #Silently dump a human-readable (hidden) version with schema
+        kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_dump -h ${PG_POD} -p 5432 -d tts-customization -U $PG_USERNAME" > ${EXPORT_DIR}/postgres/.ttscust-hr.sql 2>/dev/null
+        echo "[SUCCESS] $DBNAME $COMMAND"
+    else
+        echo "TTS Customization is not installed, skipping database."
+    fi
 
     # ----- ASYNC -----
-    echo "run pg_dump on stt-async (3/3)"
-    DBNAME="stt-async"
-    kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_dump --data-only --format=custom -h ${PG_POD} -p 5432 -d stt-async -U $PG_USERNAME" > ${EXPORT_DIR}/postgres/stt-async.export.dump
-    cmd_check
-    #Silently dump a human-readable (hidden) version with schema
-    kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_dump -h ${PG_POD} -p 5432 -d stt-async -U $PG_USERNAME" > ${EXPORT_DIR}/postgres/.sttasync-hr.sql 2>/dev/null
-    echo "[SUCCESS] $DBNAME $COMMAND"
+    if [ $doasync = 'true' ]; then
+        echo "run pg_dump on stt-async (3/3)"
+        DBNAME="stt-async"
+        kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_dump --data-only --format=custom -h ${PG_POD} -p 5432 -d stt-async -U $PG_USERNAME" > ${EXPORT_DIR}/postgres/stt-async.export.dump
+        cmd_check
+        #Silently dump a human-readable (hidden) version with schema
+        kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_dump -h ${PG_POD} -p 5432 -d stt-async -U $PG_USERNAME" > ${EXPORT_DIR}/postgres/.sttasync-hr.sql 2>/dev/null
+        echo "[SUCCESS] $DBNAME $COMMAND"
+    else
+        echo "STT Async is not installed, skipping database."
+    fi
 
     # ----- MinIO -----
     echo "----- Exporting MinIO Database -----"
@@ -266,49 +294,61 @@ if [ ${COMMAND} = 'export' ] ; then
 
     if ! $noquiesce
     then
-	unquiesce_services
+        unquiesce_services
     fi
 
 
 elif [ ${COMMAND} = 'import' ] ; then
 
     if [ ! -d "${EXPORT_DIR}" ] ; then
-	echo "no export directory: ${EXPORT_DIR}" >&2
-	echo "failed to restore" >&2
-	exit 1
+        echo "no export directory: ${EXPORT_DIR}" >&2
+        echo "failed to restore" >&2
+        exit 1
     fi
 
     if ! $noquiesce
     then
-	quiesce_services
+        quiesce_services
     fi
 
     # ----- POSTGRES -----
     echo "----- Importing PostgreSQL Database -----"
 
     # ----- STT CUST -----
-    echo "import data to stt-customization (1/3)"
-    DBNAME="stt-customization"
-    kubectl ${KUBECTL_ARGS} cp ${EXPORT_DIR}/postgres/stt-customization.export.dump ${PG_POD}:/run/stt-customization.export.dump
-    kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_restore --data-only --format=custom -d stt-customization -U $PG_USERNAME -h ${PG_POD} -p 5432 /run/stt-customization.export.dump"
-    cmd_check
-    echo "[SUCCESS] $DBNAME $COMMAND"
+    if [ $dosttcust = 'true' ]; then
+        echo "import data to stt-customization (1/3)"
+        DBNAME="stt-customization"
+        kubectl ${KUBECTL_ARGS} cp ${EXPORT_DIR}/postgres/stt-customization.export.dump ${PG_POD}:/run/stt-customization.export.dump
+        kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_restore --data-only --format=custom -d stt-customization -U $PG_USERNAME -h ${PG_POD} -p 5432 /run/stt-customization.export.dump"
+        cmd_check
+        echo "[SUCCESS] $DBNAME $COMMAND"
+    else
+        echo "STT Customization is not installed, skipping database."
+    fi
 
     # ----- TTS CUST -----
-    echo "import data to tts-customization (2/3)"
-    DBNAME="tts-customization"
-    kubectl ${KUBECTL_ARGS} cp ${EXPORT_DIR}/postgres/tts-customization.export.dump ${PG_POD}:/run/tts-customization.export.dump
-    kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_restore --data-only --format=custom -d tts-customization -U $PG_USERNAME -h ${PG_POD} -p 5432 /run/tts-customization.export.dump"
-    cmd_check
-    echo "[SUCCESS] $DBNAME $COMMAND"
+    if [ $dottscust = 'true' ]; then
+        echo "import data to tts-customization (2/3)"
+        DBNAME="tts-customization"
+        kubectl ${KUBECTL_ARGS} cp ${EXPORT_DIR}/postgres/tts-customization.export.dump ${PG_POD}:/run/tts-customization.export.dump
+        kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_restore --data-only --format=custom -d tts-customization -U $PG_USERNAME -h ${PG_POD} -p 5432 /run/tts-customization.export.dump"
+        cmd_check
+        echo "[SUCCESS] $DBNAME $COMMAND"
+    else
+        echo "TTS Customization is not installed, skipping database."
+    fi
 
     # ----- STT ASYNC -----
-    echo "import data to stt-async (3/3)"
-    DBNAME="stt-async"
-    kubectl ${KUBECTL_ARGS} cp ${EXPORT_DIR}/postgres/stt-async.export.dump ${PG_POD}:/run/stt-async.export.dump
-    kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_restore --data-only --format=custom -d stt-async -U $PG_USERNAME -h ${PG_POD} -p 5432 /run/stt-async.export.dump"
-    cmd_check
-    echo "[SUCCESS] $DBNAME $COMMAND"
+    if [ $doasync = 'true' ]; then
+        echo "import data to stt-async (3/3)"
+        DBNAME="stt-async"
+        kubectl ${KUBECTL_ARGS} cp ${EXPORT_DIR}/postgres/stt-async.export.dump ${PG_POD}:/run/stt-async.export.dump
+        kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- bash -c "export PGPASSWORD=$SQL_PASSWORD; pg_restore --data-only --format=custom -d stt-async -U $PG_USERNAME -h ${PG_POD} -p 5432 /run/stt-async.export.dump"
+        cmd_check
+        echo "[SUCCESS] $DBNAME $COMMAND"
+    else
+        echo "STT Async is not installed, skipping database."
+    fi
 
     kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- rm /run/stt-customization.export.dump
     kubectl ${KUBECTL_ARGS} exec ${PG_POD} -- rm /run/tts-customization.export.dump
@@ -331,6 +371,6 @@ elif [ ${COMMAND} = 'import' ] ; then
 
     if ! $noquiesce
     then
-	unquiesce_services
+        unquiesce_services
     fi
 fi
