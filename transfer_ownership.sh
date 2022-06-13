@@ -3,7 +3,7 @@
 printUsage() {
     echo "Usage: $(basename ${0}) [old deployment instance id] [new deployment instance id]"
     echo "    -c [custom resource name (CP4D 4.x) / release name (CP4D 3.5 and earlier)]"
-    echo "    -v [version]: 301 (CP4D3.0.1), 35 (CP4D3.5),  40 (CP4D 4.x)"
+    echo "    -v [version]: 301 (CP4D3.0.1), 35 (CP4D3.5),  40 (CP4D 4.0.x), 45 (CP4D 4.5.x)"
     echo "    -p [postgres auth secret name](optional)"
     echo "    -n [namespace](optional)"
     echo "    -h/--help [namespace](optional)"
@@ -61,9 +61,9 @@ then
     exit 1
 fi
 
-if [ $CP4D_VERSION != "301" ] && [ $CP4D_VERSION != "35" ] && [ $CP4D_VERSION != "40" ]
+if if [ $CP4D_VERSION != "301" ] && [ $CP4D_VERSION != "35" ] && [ $CP4D_VERSION != "40" ] && [ $CP4D_VERSION != "45" ]
 then
-    echo "ERROR: Version flag must be one of [301, 35 , 40], was $CP4D_VERSION"
+    echo "ERROR: Version flag must be one of [301, 35 , 40, 45], was $CP4D_VERSION"
     exit 1
 fi
 
