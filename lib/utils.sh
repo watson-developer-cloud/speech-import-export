@@ -9,8 +9,8 @@ get_mc(){
     fi
 
     ARC="amd64"
-    MC_URL="https://dl.min.io/client/mc/release/linux-${ARC}/archive/mc.RELEASE.2021-06-13T17-48-22Z"
-    MC_SHA="83be163227d125e260025e9768924d3fa85d9c299aa58b40c6701b9444789e2d mc.RELEASE.2021-06-13T17-48-22Z"
+    MC_URL="https://dl.min.io/client/mc/release/linux-amd64/mc.RELEASE.2022-06-11T21-10-36Z"
+    MC_SHA="77a784948c3bce2c169bf3f4d998ae1485c060193689268627ff896ddcf9f617"
 
     ATTEMPTS=0
     while true
@@ -25,7 +25,7 @@ get_mc(){
 	    curl -skL "${MC_URL}" -o ${DIST_DIR}/mc
 	    chmod +x ${DIST_DIR}/mc
 	fi
-	echo "83be163227d125e260025e9768924d3fa85d9c299aa58b40c6701b9444789e2d ${DIST_DIR}/mc" | sha256sum -c --status
+	echo "$MC_SHA ${DIST_DIR}/mc" | sha256sum -c --status
 
 	if [ $? -eq 0 ]; then
 	    return
