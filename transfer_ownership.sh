@@ -61,7 +61,7 @@ then
     exit 1
 fi
 
-if if [ $CP4D_VERSION != "301" ] && [ $CP4D_VERSION != "35" ] && [ $CP4D_VERSION != "40" ] && [ $CP4D_VERSION != "45" ]
+if [ $CP4D_VERSION != "301" ] && [ $CP4D_VERSION != "35" ] && [ $CP4D_VERSION != "40" ] && [ $CP4D_VERSION != "45" ]
 then
     echo "ERROR: Version flag must be one of [301, 35 , 40, 45], was $CP4D_VERSION"
     exit 1
