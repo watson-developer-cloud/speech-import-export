@@ -15,26 +15,14 @@ printUsage() {
 
 quiesce_services() {
     echo "Quiescing services"
-    if [ $CP4D_VERSION == "40" ]
-    then
-        ${LIB_DIR}/cpdbr quiesce ${KUBECTL_ARGS}
-        cmd_check
-    else
-        ${LIB_DIR}/quiesce.sh on ${CR_NAME}
-        cmd_check
-    fi
+    ${LIB_DIR}/quiesce.sh on ${CR_NAME}
+    cmd_check
 }
 
 unquiesce_services() {
     echo "Unquiescing services"
-    if [ $CP4D_VERSION == "40" ]
-    then
-        ${LIB_DIR}/cpdbr unquiesce ${KUBECTL_ARGS}
-        cmd_check
-    else
-        ${LIB_DIR}/quiesce.sh off ${CR_NAME}
-        cmd_check
-    fi
+    ${LIB_DIR}/quiesce.sh off ${CR_NAME}
+    cmd_check
 }
 
 cmd_check(){
@@ -59,11 +47,11 @@ wait_for_async_jobs() {
             echo "At least 1 async job is in 'Waiting' or 'Processing' state.. performing exponential backoff to wait for jobs to complete before switching async service to read only"
             echo "Sleeping for $sleep_time seconds"
             sleep $sleep_time
-	    if [ $(($sleep_time**2)) -gt $max_sleep_time ]; then
-		sleep_time=$max_sleep_time
-	    else
-		sleep_time=$(($sleep_time**2))
-	    fi
+            if [ $(($sleep_time**2)) -gt $max_sleep_time ]; then
+                sleep_time=$max_sleep_time
+            else
+                sleep_time=$(($sleep_time**2))
+            fi
         fi
     done
 }
@@ -180,16 +168,6 @@ else
     PG_PW_TEMPLATE="{{.data.password}}"
     PG_USERNAME="postgres"
     PG_COMPONENT_LABEL="app.kubernetes.io/component=postgres"
-
-    # if type "cpdbr" > /dev/null 2>&1; then
-    #     CPDBR=cpdbr
-    # elif type "${LIB_DIR}/cpdbr" > /dev/null 2>&1; then
-    #     CPDBR=${LIB_DIR}/cpdbr
-    # else
-    #     echo "downloading cpdbr..."
-    #     get_cpdbr ${LIB_DIR}
-    #     CPDBR=${LIB_DIR}/cpdbr
-    # fi
 
     #figure out which components are installed
     if [[ $(oc get watsonspeech $CR_NAME -o jsonpath="{.status.sttAsyncStatus}") = "Not Installed" ]]; then
