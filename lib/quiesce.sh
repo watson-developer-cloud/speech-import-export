@@ -35,8 +35,13 @@ function quiesce_async () {
 	echo "Beginning unquiesce of async service"
     fi
 
-    ASYNC_CM_NAME=`kubectl $KUBECTL_ARGS get cm -l release=$RELEASE_NAME,helm.sh/chart=sttAsync -o jsonpath="{.items[*].metadata.name}" | tr '[[:space:]]' '\n'`
-    ASYNC_DEPLOY_NAME=`kubectl $KUBECTL_ARGS get deploy -l release=$RELEASE_NAME,helm.sh/chart=sttAsync -o jsonpath="{.items[*].metadata.name}" | tr '[[:space:]]' '\n'`
+    ASYNC_CM_NAME=`kubectl $KUBECTL_ARGS get cm -l release=$RELEASE_NAME,app.kubernetes.io/component=stt-async -o jsonpath="{.items[*].metadata.name}" | tr '[[:space:]]' '\n'`
+    ASYNC_DEPLOY_NAME=`kubectl $KUBECTL_ARGS get deploy -l release=$RELEASE_NAME,app.kubernetes.io/component=stt-async -o jsonpath="{.items[*].metadata.name}" | tr '[[:space:]]' '\n'`
+
+    if [[ -z $ASYNC_CM_NAME || -z $ASYNC_DEPLOY_NAME ]]; then
+	echo "Unable to find stt-async configmap or deployment name in target namespace. STT Async may not be installed. Continuing"
+	return
+    fi
 
     kubectl $KUBECTL_ARGS get cm $ASYNC_CM_NAME -o yaml > async_cm.tmp.yaml
 
@@ -63,8 +68,13 @@ function quiesce_stt_cust () {
 	echo "Beginning unquiesce of stt-customzation service"
     fi
 
-    STT_CUST_CM_NAME=`kubectl $KUBECTL_ARGS get cm -l release=$RELEASE_NAME,helm.sh/chart=sttCustomization -o jsonpath="{.items[*].metadata.name}" | tr '[[:space:]]' '\n' | grep configmap`
-    STT_CUST_DEPLOY_NAME=`kubectl $KUBECTL_ARGS get deploy -l release=$RELEASE_NAME,helm.sh/chart=sttCustomization -o jsonpath="{.items[*].metadata.name}" | tr '[[:space:]]' '\n'`
+    STT_CUST_CM_NAME=`kubectl $KUBECTL_ARGS get cm -l release=$RELEASE_NAME,app.kubernetes.io/component=stt-customization -o jsonpath="{.items[*].metadata.name}" | tr '[[:space:]]' '\n' | grep configmap`
+    STT_CUST_DEPLOY_NAME=`kubectl $KUBECTL_ARGS get deploy -l release=$RELEASE_NAME,app.kubernetes.io/component=stt-customization -o jsonpath="{.items[*].metadata.name}" | tr '[[:space:]]' '\n'`
+
+    if [[ -z $STT_CUST_CM_NAME || -z $STT_CUST_DEPLOY_NAME ]]; then
+	echo "Unable to find stt-customization configmap or deployment name in target namespace. STT customization may not be installed. Continuing"
+	return
+    fi
 
     kubectl $KUBECTL_ARGS get cm $STT_CUST_CM_NAME -o yaml > stt_cust_cm.tmp.yaml
 
@@ -88,11 +98,17 @@ function quiesce_tts_cust () {
     if [[ ${READONLY_ENABLED} == "true" ]]; then
 	echo "Beginning quiesce of tts-customization service"
     else
-	echo "Beginning unquiesce of tts-customzation service"
+	echo "Beginning unquiesce of tts-customization service"
     fi
 
-    TTS_CUST_CM_NAME=`kubectl $KUBECTL_ARGS get cm -l release=$RELEASE_NAME,helm.sh/chart=ttsCustomization -o jsonpath="{.items[*].metadata.name}" | tr '[[:space:]]' '\n' | grep configmap`
-    TTS_CUST_DEPLOY_NAME=`kubectl $KUBECTL_ARGS get deploy -l release=$RELEASE_NAME,helm.sh/chart=ttsCustomization -o jsonpath="{.items[*].metadata.name}" | tr '[[:space:]]' '\n'`
+    #TODO: add back release label once fixed
+    TTS_CUST_CM_NAME=`kubectl $KUBECTL_ARGS get cm -l app.kubernetes.io/component=tts-customization -o jsonpath="{.items[*].metadata.name}" | tr '[[:space:]]' '\n' | grep configmap`
+    TTS_CUST_DEPLOY_NAME=`kubectl $KUBECTL_ARGS get deploy -l release=$RELEASE_NAME,app.kubernetes.io/component=tts-customization -o jsonpath="{.items[*].metadata.name}" | tr '[[:space:]]' '\n'`
+
+    if [[ -z $TTS_CUST_CM_NAME || -z $TTS_CUST_DEPLOY_NAME ]]; then
+	echo "Unable to find stt-customization configmap or deployment name in target namespace. TTS customization may not be installed. Continuing"
+	return
+    fi
 
     kubectl $KUBECTL_ARGS get cm $TTS_CUST_CM_NAME -o yaml > tts_cust_cm.tmp.yaml
 

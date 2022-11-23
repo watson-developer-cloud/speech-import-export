@@ -2,11 +2,11 @@
 
 printUsage() {
     echo "Usage: $(basename ${0}) [old deployment instance id] [new deployment instance id]"
-    echo "    -c [custom resource name (CP4D 4.x) / release name (CP4D 3.5 and earlier)]"
-    echo "    -v [version]: 301 (CP4D3.0.1), 35 (CP4D3.5),  40 (CP4D 4.0.x), 45 (CP4D 4.5.x)"
+    echo "    -c [custom resource name (CP4D 4.x) / release name (CP4D 3.5.x)]"
+    echo "    -v [version]: 3.5 (CP4D3.5),  4.0 (CP4D 4.0.x), 4.5 (CP4D 4.5.x), 4.6 (CP4D 4.6.x)"
     echo "    -p [postgres auth secret name](optional)"
     echo "    -n [namespace](optional)"
-    echo "    -h/--help [namespace](optional)"
+    echo "    -h/--help (optional)"
 }
 
 cmd_check(){
@@ -61,16 +61,16 @@ then
     exit 1
 fi
 
-if [ $CP4D_VERSION != "301" ] && [ $CP4D_VERSION != "35" ] && [ $CP4D_VERSION != "40" ] && [ $CP4D_VERSION != "45" ]
+if [ $CP4D_VERSION != "3.5" ] && [ $CP4D_VERSION != "4.0" ] && [ $CP4D_VERSION != "4.5" ] && [ $CP4D_VERSION != "4.6" ]
 then
-    echo "ERROR: Version flag must be one of [301, 35 , 40, 45], was $CP4D_VERSION"
+    echo "ERROR: Version flag must be one of [3.5, 4.0, 4.5, 4.6], was $CP4D_VERSION"
     exit 1
 fi
 
 #Use default value for postgres auth secret if not provided
 if ! $pgsecretflag
 then
-    if [ $CP4D_VERSION == "35" ] || [ $CP4D_VERSION == "301" ]
+    if [ $CP4D_VERSION == "35" ]
     then
 	PG_SECRET_NAME="user-provided-postgressql"
     else
@@ -84,16 +84,11 @@ source_uuid=$(convert_instanceid_to_uuid ${SOURCE_ID})
 dest_uuid=$(convert_instanceid_to_uuid ${DEST_ID})
 
 #CP4D version-specific setup
-if [ $CP4D_VERSION == "35" ]
+if [ $CP4D_VERSION == "3.5" ]
 then
     PG_PW_TEMPLATE="{{.data.PG_PASSWORD}}"
     PG_USERNAME="enterprisedb"
     PG_COMPONENT_LABEL="app.kubernetes.io/component=postgres"
-elif [ $CP4D_VERSION == "301" ]
-then
-    PG_PW_TEMPLATE="{{.data.pg_su_password}}"
-    PG_USERNAME="stolon"
-    PG_COMPONENT_LABEL="component=stolon-proxy"
 else
     PG_PW_TEMPLATE="{{.data.password}}"
     PG_USERNAME="postgres"

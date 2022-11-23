@@ -9,8 +9,8 @@ get_mc(){
     fi
 
     ARC="amd64"
-    MC_URL="https://dl.min.io/client/mc/release/linux-amd64/mc.RELEASE.2022-06-11T21-10-36Z"
-    MC_SHA="77a784948c3bce2c169bf3f4d998ae1485c060193689268627ff896ddcf9f617"
+    MC_URL="https://dl.min.io/client/mc/release/linux-amd64/mc.RELEASE.2022-11-17T21-20-39Z"
+    MC_SHA="f3ad04a3a103a7d3781b66f1f34a1215f2560fbb5a9e49070fe95ef3b11bc820"
 
     ATTEMPTS=0
     while true

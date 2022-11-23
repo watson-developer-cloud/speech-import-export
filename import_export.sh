@@ -4,7 +4,7 @@ printUsage() {
     echo "Usage: $(basename ${0}) [import|export]"
     echo "    -c [custom resource name (CP4D 4.x) / release name (CP4D 3.5 and earlier)]"
     echo "    -o [import/export directory]"
-    echo "    -v [version]: 301 (CP4D3.0.1), 35 (CP4D3.5),  40 (CP4D 4.0.x), 45 (CP4D 4.5.x)"
+    echo "    -v [version]: 3.5 (CP4D3.5),  4.0 (CP4D 4.0.x), 4.5 (CP4D 4.5.x), 4.6 (CP4D 4.6.x)"
     echo "    -p [postgres auth secret name](optional)"
     echo "    -m [minio auth secret name](optional)"
     echo "    -n [namespace](optional)"
@@ -50,6 +50,7 @@ cmd_check(){
 
 wait_for_async_jobs() {
     sleep_time=2
+    max_sleep_time=1800 #30m
     active_job_count=1
     while [ $active_job_count -gt 0 ]
     do
@@ -58,7 +59,11 @@ wait_for_async_jobs() {
             echo "At least 1 async job is in 'Waiting' or 'Processing' state.. performing exponential backoff to wait for jobs to complete before switching async service to read only"
             echo "Sleeping for $sleep_time seconds"
             sleep $sleep_time
-            sleep_time=$(($sleep_time**2))
+	    if [ $(($sleep_time**2)) -gt $max_sleep_time ]; then
+		sleep_time=$max_sleep_time
+	    else
+		sleep_time=$(($sleep_time**2))
+	    fi
         fi
     done
 }
@@ -122,16 +127,16 @@ then
     exit 1
 fi
 
-if [ $CP4D_VERSION != "301" ] && [ $CP4D_VERSION != "35" ] && [ $CP4D_VERSION != "40" ] && [ $CP4D_VERSION != "45" ]
+if [ $CP4D_VERSION != "3.5" ] && [ $CP4D_VERSION != "4.0" ] && [ $CP4D_VERSION != "4.5" ] && [ $CP4D_VERSION != "4.6" ]
 then
-    echo "ERROR: Version flag must be one of [301, 35 , 40, 45], was $CP4D_VERSION"
+    echo "ERROR: Version flag must be one of [3.5, 4.0, 4.5, 4.6], was $CP4D_VERSION"
     exit 1
 fi
 
 #Use default value for postgres auth secret if not provided
 if [ $pgsecretflag = 'false' ]
 then
-    if [ $CP4D_VERSION == "35" ] || [ $CP4D_VERSION == "301" ]
+    if [ $CP4D_VERSION == "3.5" ]
     then
         PG_SECRET_NAME="user-provided-postgressql"
     else
@@ -143,7 +148,7 @@ fi
 #Use default value for minio auth secret if not provided
 if [ $miniosecretflag = 'false' ]
 then
-    if [ $CP4D_VERSION == "35" ] || [ $CP4D_VERSION == "301" ]
+    if [ $CP4D_VERSION == "3.5" ]
     then
         MINIO_SECRET_NAME="minio"
     else
@@ -162,20 +167,13 @@ get_mc ${LIB_DIR}
 MC=${LIB_DIR}/mc
 
 #CP4D version-specific setup
-if [ $CP4D_VERSION == "35" ]
+if [ $CP4D_VERSION == "3.5" ]
 then
     MINIO_RELEASE_LABEL="$CR_NAME-speech-to-text-minio"
     MINIO_CHART_LABEL="helm.sh/chart=ibm-minio"
     PG_PW_TEMPLATE="{{.data.PG_PASSWORD}}"
     PG_USERNAME="enterprisedb"
     PG_COMPONENT_LABEL="app.kubernetes.io/component=postgres"
-elif [ $CP4D_VERSION == "301" ]
-then
-    MINIO_RELEASE_LABEL="$CR_NAME"
-    MINIO_CHART_LABEL="helm.sh/chart=minio"
-    PG_PW_TEMPLATE="{{.data.pg_su_password}}"
-    PG_USERNAME="stolon"
-    PG_COMPONENT_LABEL="component=stolon-proxy"
 else
     MINIO_RELEASE_LABEL="$CR_NAME"
     MINIO_CHART_LABEL="helm.sh/chart=ibm-minio"
@@ -183,15 +181,15 @@ else
     PG_USERNAME="postgres"
     PG_COMPONENT_LABEL="app.kubernetes.io/component=postgres"
 
-    if type "cpdbr" > /dev/null 2>&1; then
-        CPDBR=cpdbr
-    elif type "${LIB_DIR}/cpdbr" > /dev/null 2>&1; then
-        CPDBR=${LIB_DIR}/cpdbr
-    else
-        echo "downloading cpdbr..."
-        get_cpdbr ${LIB_DIR}
-        CPDBR=${LIB_DIR}/cpdbr
-    fi
+    # if type "cpdbr" > /dev/null 2>&1; then
+    #     CPDBR=cpdbr
+    # elif type "${LIB_DIR}/cpdbr" > /dev/null 2>&1; then
+    #     CPDBR=${LIB_DIR}/cpdbr
+    # else
+    #     echo "downloading cpdbr..."
+    #     get_cpdbr ${LIB_DIR}
+    #     CPDBR=${LIB_DIR}/cpdbr
+    # fi
 
     #figure out which components are installed
     if [[ $(oc get watsonspeech $CR_NAME -o jsonpath="{.status.sttAsyncStatus}") = "Not Installed" ]]; then
