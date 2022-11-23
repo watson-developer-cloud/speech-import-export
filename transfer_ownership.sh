@@ -70,7 +70,7 @@ fi
 #Use default value for postgres auth secret if not provided
 if ! $pgsecretflag
 then
-    if [ $CP4D_VERSION == "35" ]
+    if [ $CP4D_VERSION == "3.5" ]
     then
 	PG_SECRET_NAME="user-provided-postgressql"
     else
