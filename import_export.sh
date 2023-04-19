@@ -226,8 +226,6 @@ else
         BUCKET_SUFFIX="ibm-${CR_NAME}-${NAMESPACE}"
     fi
     STT_CUST_BUCKET="stt-customization-icp-${BUCKET_SUFFIX}"
-    STT_ASYNC_BUCKET="stt-async-icp-${BUCKET_SUFFIX}"
-    TTS_CUST_BUCKET="tts-customization-icp-${BUCKET_SUFFIX}"
 fi
 
 #Postgres setup
@@ -379,7 +377,7 @@ elif [ ${COMMAND} = 'import' ] ; then
     $MC --insecure config host add speech-minio https://localhost:$OS_LPORT ${OS_ACCESS_KEY} ${OS_SECRET_KEY}
     cmd_check
 
-    $MC --insecure cp -r ${EXPORT_DIR}/minio/${STT_CUST_BUCKET}/customizations speech-minio/${STT_CUST_BUCKET}
+    $MC --insecure cp -r ${EXPORT_DIR}/minio/$(ls ${EXPORT_DIR}/minio)/customizations speech-minio/${STT_CUST_BUCKET}
     cmd_check
 
     stop_os_port_forward $TMP_FILENAME
