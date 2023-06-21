@@ -140,7 +140,7 @@ fi
 #Use default value for minio auth secret if not provided
 if [ $s3flag = 'true' ] && [ $ossecretflag = 'false' ]
 then
-    OS_SECRET_NAME="$CR_NAME-noobaa-account"
+    OS_SECRET_NAME="noobaa-account-watson-speech"
     echo "WARNING: No S3 auth secret provided, defaulting to: $OS_SECRET_NAME"
 elif [ $ossecretflag = 'false' ]
 then
