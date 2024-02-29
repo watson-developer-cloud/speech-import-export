@@ -300,7 +300,7 @@ if [ ${COMMAND} = 'export' ] ; then
     cmd_check
 
 
-    $MC --insecure cp -r speech-minio/${STT_CUST_BUCKET} ${EXPORT_DIR}/minio
+    $MC --insecure mirror --preserve --overwrite speech-minio/${STT_CUST_BUCKET} ${EXPORT_DIR}/minio
     cmd_check
 
     stop_os_port_forward $TMP_FILENAME
@@ -377,7 +377,7 @@ elif [ ${COMMAND} = 'import' ] ; then
     $MC --insecure config host add speech-minio https://localhost:$OS_LPORT ${OS_ACCESS_KEY} ${OS_SECRET_KEY}
     cmd_check
 
-    $MC --insecure cp -r ${EXPORT_DIR}/minio/$(ls ${EXPORT_DIR}/minio)/customizations speech-minio/${STT_CUST_BUCKET}
+    $MC --insecure mirror --preserve --overwrite ${EXPORT_DIR}/minio/$(ls ${EXPORT_DIR}/minio)/customizations speech-minio/${STT_CUST_BUCKET}
     cmd_check
 
     stop_os_port_forward $TMP_FILENAME
