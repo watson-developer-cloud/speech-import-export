@@ -2,37 +2,19 @@
 
 printUsage() {
     echo "Usage: $(basename ${0}) [import|export]"
-    echo "    -c [custom resource name (CP4D 4.x) / release name (CP4D 3.5 and earlier)]"
+    echo "    -c [custom resource name]"
     echo "    -o [import/export directory]"
-    echo "    -v [version]: 3.5 (CP4D3.5),  4.0 (CP4D 4.0.x), 4.5 (CP4D 4.5.x), 4.6 (CP4D 4.6.x)"
+    echo "    -v [version]: 4.8 (CP4D 4.8.x), 5.0 (CP4D 5.0.x), 5.1 (CP4D 5.1.x)"
     echo "    -p [postgres auth secret name](optional)"
-    echo "    -m [minio or s3 auth secret name](optional)"
+    echo "    -m [s3 auth secret name](optional)"
     echo "    -n [namespace](optional)"
-    echo "    --no-quiesce Don't quiesce microservices before export (optional)"
-    echo "    --s3 use s3 for object storage (optional)"
     echo "    -h/--help Show this menu"
     exit 1
-}
-
-quiesce_services() {
-    echo "Quiescing services"
-    ${LIB_DIR}/quiesce.sh on ${CR_NAME}
-    cmd_check
-}
-
-unquiesce_services() {
-    echo "Unquiescing services"
-    ${LIB_DIR}/quiesce.sh off ${CR_NAME}
-    cmd_check
 }
 
 cmd_check(){
     if [ $? -ne 0 ] ; then
         echo "[FAIL] $DBNAME $COMMAND"
-        if [ $noquiesce = 'false' ]
-        then
-            unquiesce_services
-        fi
         exit 1
     fi
 }
@@ -57,7 +39,7 @@ wait_for_async_jobs() {
     done
 }
 
-if [ $# -lt 7 ] ; then
+if [ $# -lt 6 ] ; then
     printUsage
 fi
 
@@ -66,8 +48,6 @@ pgsecretflag=false
 ossecretflag=false
 exportflag=false
 versionflag=false
-noquiesce=false
-s3flag=false
 
 doasync=true
 dosttcust=true
@@ -87,8 +67,6 @@ do
     case $OPT in
         "-" )
             case "${OPTARG}" in
-                no-quiesce) noquiesce=true ;;
-                s3) s3flag=true ;;
                 help) printUsage; exit 1 ;;
             esac;;
         "h" ) printUsage; exit 1 ;;
@@ -119,38 +97,23 @@ then
     exit 1
 fi
 
-if [ $CP4D_VERSION != "3.5" ] && [ $CP4D_VERSION != "4.0" ] && [ $CP4D_VERSION != "4.5" ] && [ $CP4D_VERSION != "4.6" ]
+if [ $CP4D_VERSION != "4.8" ] && [ $CP4D_VERSION != "5.0" ] && [ $CP4D_VERSION != "5.1" ]
 then
-    echo "ERROR: Version flag must be one of [3.5, 4.0, 4.5, 4.6], was $CP4D_VERSION"
+    echo "ERROR: Version flag must be one of [4.8, 5.0, 5.1], was $CP4D_VERSION"
     exit 1
 fi
 
 #Use default value for postgres auth secret if not provided
 if [ $pgsecretflag = 'false' ]
-then
-    if [ $CP4D_VERSION == "3.5" ]
-    then
-        PG_SECRET_NAME="user-provided-postgressql"
-    else
-        PG_SECRET_NAME="$CR_NAME-postgres-auth-secret"
-    fi
-    echo "WARNING: No Postgres auth secret provided, defaulting to: $PG_SECRET_NAME"
+   PG_SECRET_NAME="$CR_NAME-postgres-auth-secret"
+   echo "WARNING: No Postgres auth secret provided, defaulting to: $PG_SECRET_NAME"
 fi
 
 #Use default value for minio auth secret if not provided
-if [ $s3flag = 'true' ] && [ $ossecretflag = 'false' ]
+if [ $ossecretflag = 'false' ]
 then
     OS_SECRET_NAME="noobaa-account-watson-speech"
     echo "WARNING: No S3 auth secret provided, defaulting to: $OS_SECRET_NAME"
-elif [ $ossecretflag = 'false' ]
-then
-    if [ $CP4D_VERSION == "3.5" ]
-    then
-        OS_SECRET_NAME="minio"
-    else
-        OS_SECRET_NAME="$CR_NAME-ibm-minio-auth"
-    fi
-    echo "WARNING: No MinIO auth secret provided, defaulting to: $OS_SECRET_NAME"
 fi
 
 
@@ -163,30 +126,21 @@ get_mc ${LIB_DIR}
 MC=${LIB_DIR}/mc
 
 #CP4D version-specific setup
-if [ $CP4D_VERSION == "3.5" ]
-then
-    MINIO_RELEASE_LABEL="$CR_NAME-speech-to-text-minio"
-    MINIO_CHART_LABEL="helm.sh/chart=ibm-minio"
-    PG_PW_TEMPLATE="{{.data.PG_PASSWORD}}"
-    PG_USERNAME="enterprisedb"
-    PG_COMPONENT_LABEL="app.kubernetes.io/component=postgres"
-else
-    MINIO_RELEASE_LABEL="$CR_NAME"
-    MINIO_CHART_LABEL="helm.sh/chart=ibm-minio"
-    PG_PW_TEMPLATE="{{.data.password}}"
-    PG_USERNAME="postgres"
-    PG_COMPONENT_LABEL="app.kubernetes.io/component=postgres"
+MINIO_RELEASE_LABEL="$CR_NAME"
+MINIO_CHART_LABEL="helm.sh/chart=ibm-minio"
+PG_PW_TEMPLATE="{{.data.password}}"
+PG_USERNAME="postgres"
+PG_COMPONENT_LABEL="app.kubernetes.io/component=postgres"
 
-    #figure out which components are installed
-    if [[ $(oc ${KUBECTL_ARGS} get watsonspeech $CR_NAME -o jsonpath="{.status.sttAsyncStatus}") = "Not Installed" ]]; then
-        doasync=false
-    fi
-    if [[ $(oc ${KUBECTL_ARGS} get watsonspeech $CR_NAME -o jsonpath="{.status.sttCustomizationStatus}") = "Not Installed" ]]; then
-        dosttcust=false
-    fi
-    if [[ $(oc ${KUBECTL_ARGS} get watsonspeech $CR_NAME -o jsonpath="{.status.ttsCustomizationStatus}") = "Not Installed" ]]; then
-        dottscust=false
-    fi
+#figure out which components are installed
+if [[ $(oc ${KUBECTL_ARGS} get watsonspeech $CR_NAME -o jsonpath="{.status.sttAsyncStatus}") = "Not Installed" ]]; then
+    doasync=false
+fi
+if [[ $(oc ${KUBECTL_ARGS} get watsonspeech $CR_NAME -o jsonpath="{.status.sttCustomizationStatus}") = "Not Installed" ]]; then
+    dosttcust=false
+fi
+if [[ $(oc ${KUBECTL_ARGS} get watsonspeech $CR_NAME -o jsonpath="{.status.ttsCustomizationStatus}") = "Not Installed" ]]; then
+    dottscust=false
 fi
 
 #OS setup
@@ -203,30 +157,19 @@ S3_PORT=443
 S3_NS="openshift-storage"
 S3_SVC="s3"
 
-if [ $s3flag = 'false' ] ; then
-    # ----- MinIO -----
-    echo "----- Using MinIO Resources -----"
-    OS_NS=${NAMESPACE}
-    OS_PORT=${MINIO_PORT}
-    OS_ACCESS_KEY=`kubectl ${KUBECTL_ARGS} get secret $OS_SECRET_NAME --template '{{.data.accesskey}}' | base64 --decode`
-    OS_SECRET_KEY=`kubectl ${KUBECTL_ARGS} get secret $OS_SECRET_NAME --template '{{.data.secretkey}}' | base64 --decode`
-    OS_SVC=`kubectl ${KUBECTL_ARGS} get svc -l release=$MINIO_RELEASE_LABEL,$MINIO_CHART_LABEL -o jsonpath="{.items[*].metadata.name}" | tr '[[:space:]]' '\n' | grep headless`
+# ----- S3 -----
+echo "----- Using S3 (MCG) Resources -----"
+OS_NS=${S3_NS}
+OS_PORT=${S3_PORT}
+OS_ACCESS_KEY=`kubectl ${KUBECTL_ARGS} get secret $OS_SECRET_NAME --template '{{.data.AWS_ACCESS_KEY_ID}}' | base64 --decode`
+OS_SECRET_KEY=`kubectl ${KUBECTL_ARGS} get secret $OS_SECRET_NAME --template '{{.data.AWS_SECRET_ACCESS_KEY}}' | base64 --decode`
+OS_SVC=${S3_SVC}
 
-else
-    # ----- S3 -----
-    echo "----- Using S3 (MCG) Resources -----"
-    OS_NS=${S3_NS}
-    OS_PORT=${S3_PORT}
-    OS_ACCESS_KEY=`kubectl ${KUBECTL_ARGS} get secret $OS_SECRET_NAME --template '{{.data.AWS_ACCESS_KEY_ID}}' | base64 --decode`
-    OS_SECRET_KEY=`kubectl ${KUBECTL_ARGS} get secret $OS_SECRET_NAME --template '{{.data.AWS_SECRET_ACCESS_KEY}}' | base64 --decode`
-    OS_SVC=${S3_SVC}
-
-    BUCKET_SUFFIX=`$(kubectl ${KUBECTL_ARGS} get watsonspeech $CR_NAME -o jsonpath="{.spec.global.datastores.s3.bucketSuffix}")`
-    if [[ ${BUCKET_SUFFIX} = '' ]]; then
-        BUCKET_SUFFIX="ibm-${CR_NAME}-${NAMESPACE}"
-    fi
-    STT_CUST_BUCKET="stt-customization-icp-${BUCKET_SUFFIX}"
+BUCKET_SUFFIX=`$(kubectl ${KUBECTL_ARGS} get watsonspeech $CR_NAME -o jsonpath="{.spec.global.datastores.s3.bucketSuffix}")`
+if [[ ${BUCKET_SUFFIX} = '' ]]; then
+    BUCKET_SUFFIX="ibm-${CR_NAME}-${NAMESPACE}"
 fi
+STT_CUST_BUCKET="stt-customization-icp-${BUCKET_SUFFIX}"
 
 #Postgres setup
 SQL_PASSWORD=`kubectl ${KUBECTL_ARGS} get secret $PG_SECRET_NAME --template $PG_PW_TEMPLATE | base64 --decode`
@@ -239,15 +182,11 @@ if [ ${COMMAND} = 'export' ] ; then
     echo "make export dir"
     mkdir -p ${EXPORT_DIR}
     mkdir -p "${EXPORT_DIR}/postgres"
-    mkdir -p "${EXPORT_DIR}/minio"
+    mkdir -p "${EXPORT_DIR}/s3"
 
     # block until there are no more jobs in Waiting or Processing state
     if [ $doasync = 'true' ]; then
         wait_for_async_jobs
-    fi
-
-    if [ $noquiesce = 'false' ]; then
-        quiesce_services
     fi
 
     # ----- POSTGRES -----
@@ -292,25 +231,19 @@ if [ ${COMMAND} = 'export' ] ; then
         echo "STT Async is not installed, skipping database."
     fi
 
-    # ----- MinIO -----
-    echo "----- Exporting MinIO Database -----"
+    # ----- S3 / MCG -----
+    echo "----- Exporting MCG Data -----"
     start_os_port_forward $OS_SVC $OS_LPORT $OS_PORT $OS_NS $TMP_FILENAME
 
-    $MC --insecure config host add speech-minio https://localhost:$OS_LPORT ${OS_ACCESS_KEY} ${OS_SECRET_KEY}
+    $MC --insecure config host add speech-s3 https://localhost:$OS_LPORT ${OS_ACCESS_KEY} ${OS_SECRET_KEY}
     cmd_check
 
 
-    $MC --insecure cp -r speech-minio/${STT_CUST_BUCKET} ${EXPORT_DIR}/minio
+    $MC --insecure cp -r speech-s3/${STT_CUST_BUCKET} ${EXPORT_DIR}/s3
     cmd_check
 
     stop_os_port_forward $TMP_FILENAME
-    echo "[SUCCESS] minio export"
-
-    if ! $noquiesce
-    then
-        unquiesce_services
-    fi
-
+    echo "[SUCCESS] MCG export"
 
 elif [ ${COMMAND} = 'import' ] ; then
 
@@ -318,11 +251,6 @@ elif [ ${COMMAND} = 'import' ] ; then
         echo "no export directory: ${EXPORT_DIR}" >&2
         echo "failed to restore" >&2
         exit 1
-    fi
-
-    if ! $noquiesce
-    then
-        quiesce_services
     fi
 
     # ----- POSTGRES -----
@@ -370,21 +298,17 @@ elif [ ${COMMAND} = 'import' ] ; then
 
     echo "[SUCCESS] postgres import"
 
-    # ----- MinIO -----
-    echo "----- Importing MinIO Database -----"
+    # ----- S3 / MCG -----
+    echo "----- Importing MCG Database -----"
     start_os_port_forward $OS_SVC $OS_LPORT $OS_PORT $OS_NS $TMP_FILENAME
 
-    $MC --insecure config host add speech-minio https://localhost:$OS_LPORT ${OS_ACCESS_KEY} ${OS_SECRET_KEY}
+    $MC --insecure config host add speech-s3 https://localhost:$OS_LPORT ${OS_ACCESS_KEY} ${OS_SECRET_KEY}
     cmd_check
 
-    $MC --insecure cp -r ${EXPORT_DIR}/minio/$(ls ${EXPORT_DIR}/minio)/customizations speech-minio/${STT_CUST_BUCKET}
+    $MC --insecure cp -r ${EXPORT_DIR}/s3/$(ls ${EXPORT_DIR}/s3)/customizations speech-s3/${STT_CUST_BUCKET}
     cmd_check
 
     stop_os_port_forward $TMP_FILENAME
-    echo "[SUCCESS] minio import"
+    echo "[SUCCESS] MCG import"
 
-    if ! $noquiesce
-    then
-        unquiesce_services
-    fi
 fi

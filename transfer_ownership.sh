@@ -2,8 +2,8 @@
 
 printUsage() {
     echo "Usage: $(basename ${0}) [old deployment instance id] [new deployment instance id]"
-    echo "    -c [custom resource name (CP4D 4.x) / release name (CP4D 3.5.x)]"
-    echo "    -v [version]: 3.5 (CP4D3.5),  4.0 (CP4D 4.0.x), 4.5 (CP4D 4.5.x), 4.6 (CP4D 4.6.x)"
+    echo "    -c [custom resource name]"
+    echo "    -v [version]: 4.8 (CP4D 4.8.x), 5.0 (CP4D 5.0.x), 5.1 (CP4D 5.1.x)"
     echo "    -p [postgres auth secret name](optional)"
     echo "    -n [namespace](optional)"
     echo "    -h/--help (optional)"
@@ -61,9 +61,9 @@ then
     exit 1
 fi
 
-if [ $CP4D_VERSION != "3.5" ] && [ $CP4D_VERSION != "4.0" ] && [ $CP4D_VERSION != "4.5" ] && [ $CP4D_VERSION != "4.6" ]
+if [ $CP4D_VERSION != "4.8" ] && [ $CP4D_VERSION != "5.0" ] && [ $CP4D_VERSION != "5.1" ]
 then
-    echo "ERROR: Version flag must be one of [3.5, 4.0, 4.5, 4.6], was $CP4D_VERSION"
+    echo "ERROR: Version flag must be one of [4.8, 5.0, 5.1], was $CP4D_VERSION"
     exit 1
 fi
 
