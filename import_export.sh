@@ -2,9 +2,9 @@
 
 printUsage() {
     echo "Usage: $(basename ${0}) [import|export]"
-    echo "    -c [custom resource name (CP4D 4.x) / release name (CP4D 3.5 and earlier)]"
+    echo "    -c [custom resource name (CP4D 4.x, 5.x) / release name (CP4D 3.5 and earlier)]"
     echo "    -o [import/export directory]"
-    echo "    -v [version]: 3.5 (CP4D3.5),  4.0 (CP4D 4.0.x), 4.5 (CP4D 4.5.x), 4.6 (CP4D 4.6.x)"
+    echo "    -v [version]: 3.5 (CP4D 3.5),  4.0 (CP4D 4.x or later), 5.0 (CP4D 5.x or later)"
     echo "    -p [postgres auth secret name](optional)"
     echo "    -m [minio or s3 auth secret name](optional)"
     echo "    -n [namespace](optional)"
@@ -119,9 +119,9 @@ then
     exit 1
 fi
 
-if [ $CP4D_VERSION != "3.5" ] && [ $CP4D_VERSION != "4.0" ] && [ $CP4D_VERSION != "4.5" ] && [ $CP4D_VERSION != "4.6" ]
+if [ $CP4D_VERSION != "3.5" ] && [[ $CP4D_VERSION != "4."* ]] && [[ $CP4D_VERSION != "5."* ]]
 then
-    echo "ERROR: Version flag must be one of [3.5, 4.0, 4.5, 4.6], was $CP4D_VERSION"
+    echo "ERROR: Version flag must be one of [3.5, 4.x, 5.x], was $CP4D_VERSION"
     exit 1
 fi
 
