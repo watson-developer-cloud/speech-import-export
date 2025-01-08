@@ -105,6 +105,7 @@ fi
 
 #Use default value for postgres auth secret if not provided
 if [ $pgsecretflag = 'false' ]
+then
    PG_SECRET_NAME="$CR_NAME-postgres-auth-secret"
    echo "WARNING: No Postgres auth secret provided, defaulting to: $PG_SECRET_NAME"
 fi
